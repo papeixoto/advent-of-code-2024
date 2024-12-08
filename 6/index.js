@@ -94,37 +94,65 @@ function findGuard(matrix) {
   };
 }
 
-function moveGuard(matrix, i, j, direction) {
+let obstaclesData = Array.from(Array(130), () => new Array(130));
+
+function moveGuard(matrix, i, j, direction, saveObstacles = false) {
   const nextCoords = DIRECTIONS[direction].getNextCoords(matrix, i, j);
   matrix[i][j] = "X";
-
-  if (!nextCoords) return;
+  const status = {
+    coordinates: nextCoords,
+    direction,
+  };
 
   // rotate
-  if (matrix[nextCoords.i][nextCoords.j] === "#") {
+  if (matrix?.[nextCoords?.i]?.[nextCoords?.j] === "#") {
     const nextDir = DIRECTIONS[direction].nextDirection;
+    // console.log("NEXT DIR ", nextCoords);
+    // console.log("PREV ", obstaclesData);
+    // if (saveObstacles) obstaclesData[nextCoords.i][nextCoords.j] = direction;
+    // console.log("NEXT ", obstaclesData);
     matrix[i][j] = DIRECTIONS[nextDir].guardChar;
+    guardDirection = nextDir;
+    // console.log("obstaclesData[i][j] ", obstaclesData[i][j], direction);
+    // if (obstaclesData[i][j] === direction) return true;
+    status.coordinates = {
+      i,
+      j,
+    };
+    status.direction = nextDir;
   } else {
     // just move guard
-    matrix[nextCoords.i][nextCoords.j] = DIRECTIONS[direction].guardChar;
+    try {
+      matrix[nextCoords?.i][nextCoords?.j] = DIRECTIONS[direction].guardChar;
+    } catch (e) {
+      // console.log(e);
+    }
   }
+  return status;
 }
 
 // performance could be improved by checking the next "#" and doing that whole path
-async function calculateNumberOfDistinctPositions() {
+async function part1() {
   const mapMatrix = await parseFile();
+  const height = mapMatrix.length;
+  const width = mapMatrix[0].length;
 
+  console.time();
   let guardStatus = findGuard(mapMatrix);
 
-  while (guardStatus?.isGuardInTheMap) {
-    moveGuard(
+  do {
+    guardStatus = moveGuard(
       mapMatrix,
       guardStatus.coordinates.i,
       guardStatus.coordinates.j,
       guardStatus.direction
     );
-    guardStatus = findGuard(mapMatrix);
-  }
+  } while (
+    guardStatus?.coordinates?.i >= 0 &&
+    guardStatus?.coordinates?.i < height &&
+    guardStatus?.coordinates?.j >= 0 &&
+    guardStatus?.coordinates?.j < width
+  );
 
   let acc = 0;
   mapMatrix.forEach((line) =>
@@ -132,6 +160,7 @@ async function calculateNumberOfDistinctPositions() {
       if (cell === "X") acc += 1;
     })
   );
+  console.timeEnd();
 
   console.log("acc ", acc);
   return acc;
@@ -380,50 +409,84 @@ async function calculateNumberOfStuckInLoopObstacles() {
   // console.log("fora do while");
 
   const uniqueObstacles = new Map(obstacles.map((el) => [el, 1]));
-  console.log("banana ", uniqueObstacles);
+  // console.log("banana ", uniqueObstacles);
   return obstacles;
 }
 
 async function bruteForce() {
   const mapMatrix = await parseFile();
 
-  let guardStatus;
+  console.time("start");
+  const height = mapMatrix.length;
+  const width = mapMatrix[0].length;
+  let initialGuardStatus = findGuard(mapMatrix);
+  let guardStatus = initialGuardStatus;
+
+  do {
+    guardStatus = moveGuard(
+      mapMatrix,
+      guardStatus.coordinates.i,
+      guardStatus.coordinates.j,
+      guardStatus.direction
+    );
+  } while (
+    guardStatus?.coordinates?.i >= 0 &&
+    guardStatus?.coordinates?.i < height &&
+    guardStatus?.coordinates?.j >= 0 &&
+    guardStatus?.coordinates?.j < width
+  );
+
+  guardStatus;
   let acc = 0;
+
+  mapMatrix[initialGuardStatus.coordinates.i][
+    initialGuardStatus.coordinates.j
+  ] = DIRECTIONS[initialGuardStatus.direction].guardChar;
 
   mapMatrix.forEach((line, i) => {
     line.forEach((cell, j) => {
       console.time();
-      console.log("checking ", i, j, cell);
-      if (cell !== ".") return;
+      // console.log("checking ", i, j, cell);
+      if (cell !== "X") return;
       guardStatus = findGuard(mapMatrix);
       let localMapMatrix = mapMatrix.map((el) => el.slice());
       localMapMatrix[i][j] = "#";
+      // console.log("localMapMatrix ", localMapMatrix);
+      let loop = false;
       let numberOfMoves = 0;
-      while (guardStatus?.isGuardInTheMap && numberOfMoves < 10000) {
-        numberOfMoves += 1;
-        moveGuard(
+      do {
+        guardStatus = moveGuard(
           localMapMatrix,
           guardStatus.coordinates.i,
           guardStatus.coordinates.j,
           guardStatus.direction
         );
-        guardStatus = findGuard(localMapMatrix);
-      }
+        numberOfMoves += 1;
+      } while (
+        guardStatus?.coordinates?.i >= 0 &&
+        guardStatus?.coordinates?.i < height &&
+        guardStatus?.coordinates?.j >= 0 &&
+        guardStatus?.coordinates?.j < width &&
+        numberOfMoves < 10000
+      );
       if (numberOfMoves === 10000) {
         console.log("FOUND ", i, j);
         acc += 1;
+        loop = false;
       }
       console.timeEnd();
     });
   });
-
+  console.timeEnd("start");
   console.log("acc ", acc);
+  console.log("obstacles ", obstaclesData);
   return acc;
 }
 
-// calculateNumberOfDistinctPositions();
+// part1();
 // calculateNumberOfStuckInLoopObstacles();
 bruteForce();
 
 // answers
 // 1: 5095
+// 2: 1933
